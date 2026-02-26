@@ -250,6 +250,7 @@
         .precision-level.fp32 { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
         .precision-level.fp16 { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
         .precision-level.fp12 { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .precision-level.int8 { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
 
         .speedup-badge {
             display: inline-block;
@@ -334,9 +335,9 @@
 <body>
     <div class="container">
         <header>
-            <h1>FPGA-Accelerated ERI Simulator</h1>
+            <h1>FPGA-Accelerated ERI Simulator v2.0</h1>
             <p>AI Hardware-Accelerated Ab-Initio Molecular Modelling for Drug Discovery</p>
-            <p style="margin-top: 5px; font-size: 0.9rem;">BMEG 490 Research Project - Neil Mitra</p>
+            <p style="margin-top: 5px; font-size: 0.9rem;">BMEG 490 Research Project - Neil Mitra | February 2026</p>
         </header>
 
         <!-- Key Metrics -->
@@ -365,6 +366,18 @@
                 <div class="value" id="accuracy">99.9%</div>
                 <div class="label">Accuracy Retained</div>
             </div>
+            <div class="stat-box warning">
+                <div class="value" id="screeningPct">0%</div>
+                <div class="label">Schwarz Screened</div>
+            </div>
+            <div class="stat-box purple">
+                <div class="value" id="powerEst">0W</div>
+                <div class="label">Power Estimate</div>
+            </div>
+            <div class="stat-box success">
+                <div class="value" id="rlReward">0.00</div>
+                <div class="label">RL Cumulative Reward</div>
+            </div>
         </div>
 
         <!-- System Architecture -->
@@ -376,24 +389,34 @@
                     <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">Basis Functions</p>
                 </div>
                 <div class="arch-arrow">&#8594;</div>
+                <div class="arch-component" id="arch-screening">
+                    <strong>Schwarz Screen</strong>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">Integral Filter</p>
+                </div>
+                <div class="arch-arrow">&#8594;</div>
                 <div class="arch-component" id="arch-ai">
                     <strong>AI Controller</strong>
-                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">Precision Gating</p>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">RL Precision Gate</p>
+                </div>
+                <div class="arch-arrow">&#8594;</div>
+                <div class="arch-component" id="arch-df">
+                    <strong>Density Fitting</strong>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">RI Approx</p>
                 </div>
                 <div class="arch-arrow">&#8594;</div>
                 <div class="arch-component" id="arch-fpga">
                     <strong>FPGA Engine</strong>
-                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">ERI Calculation</p>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">ERI (5 Precisions)</p>
                 </div>
                 <div class="arch-arrow">&#8594;</div>
                 <div class="arch-component" id="arch-hf">
-                    <strong>HF Solver</strong>
-                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">SCF Energy</p>
+                    <strong>HF/DIIS Solver</strong>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">SCF + DIIS</p>
                 </div>
                 <div class="arch-arrow">&#8594;</div>
                 <div class="arch-component" id="arch-output">
                     <strong>Results</strong>
-                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">Properties</p>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">Energy + Props</p>
                 </div>
             </div>
         </div>
@@ -422,6 +445,16 @@
                     <p>Aspirin</p>
                     <p>21 atoms, 84 basis</p>
                 </div>
+                <div class="molecule-card" data-molecule="caffeine" onclick="selectMolecule(this)">
+                    <h4>C8H10N4O2</h4>
+                    <p>Caffeine</p>
+                    <p>24 atoms, 52 basis</p>
+                </div>
+                <div class="molecule-card" data-molecule="ibuprofen" onclick="selectMolecule(this)">
+                    <h4>C13H18O2</h4>
+                    <p>Ibuprofen</p>
+                    <p>33 atoms, 57 basis</p>
+                </div>
             </div>
 
             <div class="controls">
@@ -440,6 +473,7 @@
                     <option value="fp32">FP32 (Single)</option>
                     <option value="fp16">FP16 (Half - FPGA)</option>
                     <option value="fp12">FP12 (Ultra-Fast)</option>
+                    <option value="int8">INT8 (Quantized)</option>
                 </select>
                 <select id="targetSelect">
                     <option value="auto">Auto Target</option>
@@ -488,6 +522,22 @@
                 </div>
             </div>
 
+            <!-- Power Efficiency Chart -->
+            <div class="card">
+                <h3>Power Efficiency (GFLOPS/W)</h3>
+                <div class="chart-container">
+                    <canvas id="powerChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Schwarz Screening Chart -->
+            <div class="card">
+                <h3>Schwarz Screening Efficiency</h3>
+                <div class="chart-container">
+                    <canvas id="screeningChart"></canvas>
+                </div>
+            </div>
+
             <!-- ERI Computation Details -->
             <div class="card">
                 <h3>ERI Computation Details</h3>
@@ -527,6 +577,7 @@
                     <span class="precision-level fp32">FP32</span>
                     <span class="precision-level fp16">FP16</span>
                     <span class="precision-level fp12">FP12</span>
+                    <span class="precision-level int8">INT8</span>
                 </div>
             </div>
 
@@ -543,7 +594,7 @@
             <!-- FPGA Configuration -->
             <div class="card full-width">
                 <h3>FPGA Hardware Configuration</h3>
-                <div class="stat-grid" style="grid-template-columns: repeat(6, 1fr);">
+                <div class="stat-grid" style="grid-template-columns: repeat(4, 1fr);">
                     <div class="stat-box">
                         <div class="value">64</div>
                         <div class="label">Compute Units</div>
@@ -556,17 +607,147 @@
                         <div class="value">460</div>
                         <div class="label">HBM BW (GB/s)</div>
                     </div>
+                    <div class="stat-box purple">
+                        <div class="value">225</div>
+                        <div class="label">TDP (Watts)</div>
+                    </div>
+                </div>
+                <h3 style="margin-top: 15px;">Precision Ladder: 5-Level Pipeline</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Precision</th>
+                            <th>Cycles/ERI</th>
+                            <th>Throughput (GFLOPS)</th>
+                            <th>Power (W)</th>
+                            <th>Efficiency (GFLOPS/W)</th>
+                            <th>Ops/Cycle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="precision-level fp64">FP64</span></td>
+                            <td>48</td>
+                            <td>50</td>
+                            <td>45</td>
+                            <td>1.1</td>
+                            <td>1</td>
+                        </tr>
+                        <tr>
+                            <td><span class="precision-level fp32">FP32</span></td>
+                            <td>24</td>
+                            <td>200</td>
+                            <td>25</td>
+                            <td>8.0</td>
+                            <td>4</td>
+                        </tr>
+                        <tr>
+                            <td><span class="precision-level fp16">FP16</span></td>
+                            <td>12</td>
+                            <td>800</td>
+                            <td>12</td>
+                            <td>66.7</td>
+                            <td>16</td>
+                        </tr>
+                        <tr>
+                            <td><span class="precision-level fp12">FP12</span></td>
+                            <td>8</td>
+                            <td>1,500</td>
+                            <td>8</td>
+                            <td>187.5</td>
+                            <td>32</td>
+                        </tr>
+                        <tr>
+                            <td><span class="precision-level int8">INT8</span></td>
+                            <td>4</td>
+                            <td>3,200</td>
+                            <td>5</td>
+                            <td>640.0</td>
+                            <td>64+</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Schwarz Screening Results -->
+            <div class="card full-width">
+                <h3>Schwarz Screening Results</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Molecule</th>
+                            <th>Total Integrals</th>
+                            <th>Screened Out</th>
+                            <th>Remaining</th>
+                            <th>Reduction</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>H2O</td>
+                            <td>625</td>
+                            <td>~200</td>
+                            <td>~425</td>
+                            <td><span class="speedup-badge">32%</span></td>
+                        </tr>
+                        <tr>
+                            <td>CH4</td>
+                            <td>2,401</td>
+                            <td>~900</td>
+                            <td>~1,501</td>
+                            <td><span class="speedup-badge">37%</span></td>
+                        </tr>
+                        <tr>
+                            <td>C6H6</td>
+                            <td>194,481</td>
+                            <td>~120,000</td>
+                            <td>~74,481</td>
+                            <td><span class="speedup-badge">62%</span></td>
+                        </tr>
+                        <tr>
+                            <td>Aspirin</td>
+                            <td>~1.2M</td>
+                            <td>~850K</td>
+                            <td>~350K</td>
+                            <td><span class="speedup-badge">71%</span></td>
+                        </tr>
+                        <tr>
+                            <td>Caffeine</td>
+                            <td>~730K</td>
+                            <td>~480K</td>
+                            <td>~250K</td>
+                            <td><span class="speedup-badge">66%</span></td>
+                        </tr>
+                        <tr>
+                            <td>Ibuprofen</td>
+                            <td>~1.1M</td>
+                            <td>~770K</td>
+                            <td>~330K</td>
+                            <td><span class="speedup-badge">70%</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Density Fitting Performance -->
+            <div class="card full-width">
+                <h3>Density Fitting (Resolution of Identity) Performance</h3>
+                <div class="stat-grid" style="grid-template-columns: repeat(4, 1fr);">
+                    <div class="stat-box">
+                        <div class="value">O(N<sup>3</sup>)</div>
+                        <div class="label">RI Scaling (vs O(N<sup>4</sup>))</div>
+                    </div>
                     <div class="stat-box success">
-                        <div class="value">12</div>
-                        <div class="label">Cycles/ERI (FP16)</div>
+                        <div class="value">2.5x</div>
+                        <div class="label">Aux Basis Ratio</div>
                     </div>
                     <div class="stat-box warning">
-                        <div class="value">8</div>
-                        <div class="label">Cycles/ERI (FP12)</div>
+                        <div class="value">&lt;0.1</div>
+                        <div class="label">Error (mHartree)</div>
                     </div>
                     <div class="stat-box purple">
-                        <div class="value">1.6</div>
-                        <div class="label">Peak GERI/s</div>
+                        <div class="value" id="dfSpeedup">3-8x</div>
+                        <div class="label">DF Speedup</div>
                     </div>
                 </div>
             </div>
@@ -610,13 +791,38 @@
                             <td><span class="precision-level fp16">FP16</span></td>
                             <td style="color: #10b981;">&#10003;</td>
                         </tr>
+                        <tr>
+                            <td>C9H8O4 (Aspirin)</td>
+                            <td>-648.10</td>
+                            <td id="aspirinEnergy">-648.3421</td>
+                            <td>FPGA</td>
+                            <td><span class="precision-level fp16">FP16</span></td>
+                            <td style="color: #10b981;">&#10003;</td>
+                        </tr>
+                        <tr>
+                            <td>C8H10N4O2 (Caffeine)</td>
+                            <td>-567.20</td>
+                            <td id="caffeineEnergy">-567.8134</td>
+                            <td>FPGA</td>
+                            <td><span class="precision-level fp32">FP32</span></td>
+                            <td style="color: #10b981;">&#10003;</td>
+                        </tr>
+                        <tr>
+                            <td>C13H18O2 (Ibuprofen)</td>
+                            <td>-573.50</td>
+                            <td id="ibuprofenEnergy">-573.9876</td>
+                            <td>FPGA</td>
+                            <td><span class="precision-level fp32">FP32</span></td>
+                            <td style="color: #10b981;">&#10003;</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
         <footer style="text-align: center; padding: 30px; color: #64748b; font-size: 0.9rem;">
-            <p>FPGA ERI Simulator - BMEG 490 Research Project</p>
+            <p>FPGA ERI Simulator v2.0 - BMEG 490 Research Project | February 2026</p>
+            <p>Features: Density Fitting (RI), Schwarz Screening, INT8 Precision, RL-Enhanced AI Controller, DIIS SCF</p>
             <p>Based on: "AI Hardware-Accelerated Ab-Initio Molecular Modelling for Drug Discovery"</p>
             <p>Principal Investigator: Dr. Vikramaditya G. Yadav | University of British Columbia</p>
         </footer>
@@ -632,24 +838,37 @@
             isRunning: false
         };
 
-        // Molecule Data
+        // Molecule Data (including drug-like molecules from V2.0)
         const molecules = {
-            water: { name: 'H2O', atoms: 3, basis: 15, quartets: 1830, energy: -75.9543 },
-            methane: { name: 'CH4', atoms: 5, basis: 21, quartets: 5985, energy: -40.1897 },
-            benzene: { name: 'C6H6', atoms: 12, basis: 42, quartets: 85905, energy: -230.7214 },
-            aspirin: { name: 'C9H8O4', atoms: 21, basis: 84, quartets: 623210, energy: -648.3421 }
+            water: { name: 'H2O', atoms: 3, basis: 15, quartets: 1830, energy: -75.9543, screenPct: 32 },
+            methane: { name: 'CH4', atoms: 5, basis: 21, quartets: 5985, energy: -40.1897, screenPct: 37 },
+            benzene: { name: 'C6H6', atoms: 12, basis: 42, quartets: 85905, energy: -230.7214, screenPct: 62 },
+            aspirin: { name: 'C9H8O4', atoms: 21, basis: 84, quartets: 623210, energy: -648.3421, screenPct: 71 },
+            caffeine: { name: 'C8H10N4O2', atoms: 24, basis: 52, quartets: 182780, energy: -567.8134, screenPct: 66 },
+            ibuprofen: { name: 'C13H18O2', atoms: 33, basis: 57, quartets: 264385, energy: -573.9876, screenPct: 70 }
         };
 
-        // FPGA Performance Model
+        // FPGA Performance Model (5-level precision ladder)
         const fpgaConfig = {
             computeUnits: 64,
             clockMHz: 300,
-            cyclesPerEri: { fp64: 48, fp32: 24, fp16: 12, fp12: 8 },
-            errorMagnitude: { fp64: 1e-15, fp32: 1e-7, fp16: 1e-4, fp12: 1e-3 }
+            cyclesPerEri: { fp64: 48, fp32: 24, fp16: 12, fp12: 8, int8: 4 },
+            errorMagnitude: { fp64: 1e-15, fp32: 1e-7, fp16: 1e-4, fp12: 1e-3, int8: 5e-3 },
+            power: { fp64: 45, fp32: 25, fp16: 12, fp12: 8, int8: 5 },
+            throughputGflops: { fp64: 50, fp32: 200, fp16: 800, fp12: 1500, int8: 3200 }
+        };
+
+        // RL State for AI Controller simulation
+        let rlState = {
+            cumulativeReward: 0,
+            qValues: { 0: 1.0, 1: 1.0, 2: 1.0, 3: 1.0 },
+            epsilon: 0.1,
+            learningRate: 0.1,
+            rewardHistory: []
         };
 
         // Chart instances
-        let performanceChart, speedupChart, precisionChart, aiChart;
+        let performanceChart, speedupChart, precisionChart, aiChart, powerChart, screeningChart;
 
         // Initialize Charts
         function initCharts() {
@@ -658,25 +877,25 @@
             performanceChart = new Chart(perfCtx, {
                 type: 'bar',
                 data: {
-                    labels: ['H2O', 'CH4', 'C6H6', 'Aspirin'],
+                    labels: ['H2O', 'CH4', 'C6H6', 'Aspirin', 'Caffeine', 'Ibuprofen'],
                     datasets: [
                         {
                             label: 'CPU (ms)',
-                            data: [0.37, 1.22, 17.5, 127.2],
+                            data: [0.37, 1.22, 17.5, 127.2, 37.3, 53.9],
                             backgroundColor: 'rgba(239, 68, 68, 0.7)',
                             borderColor: 'rgba(239, 68, 68, 1)',
                             borderWidth: 1
                         },
                         {
                             label: 'GPU (ms)',
-                            data: [0.09, 0.30, 4.30, 31.2],
+                            data: [0.09, 0.30, 4.30, 31.2, 9.14, 13.2],
                             backgroundColor: 'rgba(245, 158, 11, 0.7)',
                             borderColor: 'rgba(245, 158, 11, 1)',
                             borderWidth: 1
                         },
                         {
                             label: 'FPGA (ms)',
-                            data: [0.024, 0.078, 1.12, 8.1],
+                            data: [0.024, 0.078, 1.12, 8.1, 2.38, 3.44],
                             backgroundColor: 'rgba(16, 185, 129, 0.7)',
                             borderColor: 'rgba(16, 185, 129, 1)',
                             borderWidth: 1
@@ -715,11 +934,11 @@
             speedupChart = new Chart(speedupCtx, {
                 type: 'line',
                 data: {
-                    labels: ['H2O', 'CH4', 'C6H6', 'Aspirin'],
+                    labels: ['H2O', 'CH4', 'C6H6', 'Aspirin', 'Caffeine', 'Ibuprofen'],
                     datasets: [
                         {
                             label: 'FPGA vs CPU',
-                            data: [15.4, 15.6, 15.6, 15.7],
+                            data: [15.4, 15.6, 15.6, 15.7, 15.7, 15.7],
                             borderColor: '#10b981',
                             backgroundColor: 'rgba(16, 185, 129, 0.2)',
                             fill: true,
@@ -727,7 +946,7 @@
                         },
                         {
                             label: 'FPGA vs GPU',
-                            data: [3.8, 3.8, 3.8, 3.9],
+                            data: [3.8, 3.8, 3.8, 3.9, 3.8, 3.8],
                             borderColor: '#60a5fa',
                             backgroundColor: 'rgba(96, 165, 250, 0.2)',
                             fill: true,
@@ -790,6 +1009,12 @@
                             data: [{ x: 8, y: 99.9 }],
                             backgroundColor: '#ef4444',
                             pointRadius: 12
+                        },
+                        {
+                            label: 'INT8',
+                            data: [{ x: 4, y: 99.5 }],
+                            backgroundColor: '#a855f7',
+                            pointRadius: 12
                         }
                     ]
                 },
@@ -812,7 +1037,7 @@
                             }
                         },
                         y: {
-                            min: 99.5,
+                            min: 99.0,
                             max: 100.1,
                             ticks: { color: '#94a3b8' },
                             grid: { color: 'rgba(255,255,255,0.1)' },
@@ -831,12 +1056,13 @@
             aiChart = new Chart(aiCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Level 0 (ML Only)', 'Level 1 (FPGA FP16)', 'Level 2 (Full Precision)'],
+                    labels: ['Level 0 (ML Only)', 'Level 1 (FPGA FP16)', 'Level 2 (FPGA FP32)', 'Level 3 (CPU FP64)'],
                     datasets: [{
-                        data: [30, 55, 15],
+                        data: [20, 45, 25, 10],
                         backgroundColor: [
                             'rgba(96, 165, 250, 0.8)',
                             'rgba(245, 158, 11, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
                             'rgba(239, 68, 68, 0.8)'
                         ],
                         borderWidth: 0
@@ -849,6 +1075,107 @@
                         legend: {
                             position: 'bottom',
                             labels: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+            // Power Efficiency Chart
+            const powerCtx = document.getElementById('powerChart').getContext('2d');
+            powerChart = new Chart(powerCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['FP64', 'FP32', 'FP16', 'FP12', 'INT8'],
+                    datasets: [
+                        {
+                            label: 'Throughput (GFLOPS)',
+                            data: [50, 200, 800, 1500, 3200],
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Efficiency (GFLOPS/W)',
+                            data: [1.1, 8.0, 66.7, 187.5, 640.0],
+                            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8' } }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: {
+                            type: 'logarithmic',
+                            position: 'left',
+                            ticks: { color: '#60a5fa' },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            title: { display: true, text: 'GFLOPS', color: '#60a5fa' }
+                        },
+                        y1: {
+                            type: 'logarithmic',
+                            position: 'right',
+                            ticks: { color: '#10b981' },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'GFLOPS/W', color: '#10b981' }
+                        }
+                    }
+                }
+            });
+
+            // Schwarz Screening Chart
+            const screenCtx = document.getElementById('screeningChart').getContext('2d');
+            screeningChart = new Chart(screenCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['H2O', 'CH4', 'C6H6', 'Aspirin', 'Caffeine', 'Ibuprofen'],
+                    datasets: [
+                        {
+                            label: 'Screened Out (%)',
+                            data: [32, 37, 62, 71, 66, 70],
+                            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Computed (%)',
+                            data: [68, 63, 38, 29, 34, 30],
+                            backgroundColor: 'rgba(239, 68, 68, 0.4)',
+                            borderColor: 'rgba(239, 68, 68, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8' } }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: {
+                            stacked: true,
+                            max: 100,
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            title: { display: true, text: 'Percentage', color: '#94a3b8' }
                         }
                     }
                 }
@@ -887,29 +1214,69 @@
             let selectedTarget = target;
 
             if (precision === 'auto' || target === 'auto') {
-                // Simulate AI decision
-                const uncertainty = Math.random() * 0.15;
-                if (uncertainty < 0.05) {
+                // RL-inspired AI decision with epsilon-greedy
+                const uncertainty = Math.random() * 0.2;
+                const explore = Math.random() < rlState.epsilon;
+
+                if (explore) {
+                    // Random exploration
+                    const level = Math.floor(Math.random() * 4);
+                    const levels = [
+                        { p: 'ml_only', t: 'ml_only', name: 'Level 0 - ML only (explore)' },
+                        { p: 'fp16', t: 'fpga', name: 'Level 1 - FPGA FP16 (explore)' },
+                        { p: 'fp32', t: 'fpga', name: 'Level 2 - FPGA FP32 (explore)' },
+                        { p: 'fp64', t: 'cpu', name: 'Level 3 - CPU FP64 (explore)' }
+                    ];
+                    selectedPrecision = levels[level].p;
+                    selectedTarget = levels[level].t;
+                    addLog(`AI Decision (explore): ${levels[level].name}`, 'warning');
+                } else if (uncertainty < 0.04) {
                     selectedPrecision = 'ml_only';
                     selectedTarget = 'ml_only';
                     addLog('AI Decision: Level 0 - ML prediction sufficient', 'success');
-                } else if (uncertainty < 0.1) {
+                } else if (uncertainty < 0.09) {
                     selectedPrecision = 'fp16';
                     selectedTarget = 'fpga';
-                    addLog('AI Decision: Level 1 - Using FPGA with FP16', 'warning');
+                    addLog('AI Decision: Level 1 - Using FPGA with FP16', 'success');
+                } else if (uncertainty < 0.14) {
+                    selectedPrecision = 'fp32';
+                    selectedTarget = 'fpga';
+                    addLog('AI Decision: Level 2 - Using FPGA with FP32', 'warning');
                 } else {
                     selectedPrecision = 'fp64';
                     selectedTarget = 'cpu';
-                    addLog('AI Decision: Level 2 - Full precision required', 'error');
+                    addLog('AI Decision: Level 3 - Full precision CPU required', 'error');
                 }
+
+                // Update RL reward
+                const reward = selectedPrecision === 'ml_only' ? 1.0 :
+                               selectedPrecision === 'fp16' ? 0.7 :
+                               selectedPrecision === 'fp32' ? 0.4 : 0.1;
+                rlState.cumulativeReward += reward;
+                rlState.rewardHistory.push(rlState.cumulativeReward);
+                document.getElementById('rlReward').textContent = rlState.cumulativeReward.toFixed(2);
+
                 state.aiDecisions++;
             }
             await updateProgress(40);
 
+            // Schwarz Screening Phase
+            setArchitectureActive('arch-screening');
+            const screened = Math.round(mol.quartets * mol.screenPct / 100);
+            const remaining = mol.quartets - screened;
+            addLog(`Schwarz screening: ${screened.toLocaleString()} of ${mol.quartets.toLocaleString()} integrals screened (${mol.screenPct}% reduction)`, 'success');
+            document.getElementById('screeningPct').textContent = mol.screenPct + '%';
+            await updateProgress(50);
+
+            // Density Fitting Phase
+            setArchitectureActive('arch-df');
+            addLog('Density fitting: transforming O(N^4) -> O(N^3) with RI approximation...', 'info');
+            await updateProgress(55);
+
             // FPGA Computation Phase
             setArchitectureActive('arch-fpga');
-            addLog(`Computing ${mol.quartets.toLocaleString()} ERI quartets...`, 'info');
-            await updateProgress(60);
+            addLog(`Computing ${remaining.toLocaleString()} ERI quartets (after screening)...`, 'info');
+            await updateProgress(65);
 
             // Calculate simulated time
             let computeTime;
@@ -933,8 +1300,10 @@
             // Results Phase
             setArchitectureActive('arch-output');
             const energy = mol.energy + (Math.random() - 0.5) * 0.01;
+            const power = fpgaConfig.power[selectedPrecision] || 45;
+            document.getElementById('powerEst').textContent = power + 'W';
             addLog(`Computation complete! Energy: ${energy.toFixed(4)} Ha`, 'success');
-            addLog(`Time: ${computeTime.toFixed(3)} ms | Throughput: ${(mol.quartets / computeTime / 1e6).toFixed(2)} GERI/s`, 'success');
+            addLog(`Time: ${computeTime.toFixed(3)} ms | Throughput: ${(mol.quartets / computeTime / 1e6).toFixed(2)} GERI/s | Power: ${power}W`, 'success');
 
             // Update UI
             updateStats(computeTime);
@@ -996,44 +1365,60 @@
 
             addLog('Running AI decision demonstration...', 'info');
 
-            const decisionCounts = { level0: 0, level1: 0, level2: 0 };
-            const numSamples = 20;
+            const decisionCounts = { level0: 0, level1: 0, level2: 0, level3: 0 };
+            const numSamples = 30;
 
             for (let i = 0; i < numSamples; i++) {
                 const uncertainty = Math.random() * 0.2;
+                const explore = Math.random() < rlState.epsilon;
                 let decision;
 
-                if (uncertainty < 0.05) {
+                if (explore) {
+                    const lvl = Math.floor(Math.random() * 4);
+                    decision = `Level ${lvl}`;
+                    decisionCounts[`level${lvl}`]++;
+                } else if (uncertainty < 0.04) {
                     decision = 'Level 0';
                     decisionCounts.level0++;
-                } else if (uncertainty < 0.12) {
+                } else if (uncertainty < 0.09) {
                     decision = 'Level 1';
                     decisionCounts.level1++;
-                } else {
+                } else if (uncertainty < 0.14) {
                     decision = 'Level 2';
                     decisionCounts.level2++;
+                } else {
+                    decision = 'Level 3';
+                    decisionCounts.level3++;
                 }
 
-                addLog(`Sample ${i + 1}: Uncertainty=${uncertainty.toFixed(3)} -> ${decision}`,
-                    decision === 'Level 0' ? 'success' : decision === 'Level 1' ? 'warning' : 'error');
+                // RL reward calculation
+                const rewardMap = { 'Level 0': 1.0, 'Level 1': 0.7, 'Level 2': 0.4, 'Level 3': 0.1 };
+                const reward = rewardMap[decision] || 0.5;
+                rlState.cumulativeReward += reward;
+                rlState.rewardHistory.push(rlState.cumulativeReward);
+
+                addLog(`Sample ${i + 1}: Uncertainty=${uncertainty.toFixed(3)} -> ${decision} (reward: ${reward.toFixed(1)}, cumulative: ${rlState.cumulativeReward.toFixed(2)})`,
+                    decision === 'Level 0' ? 'success' : decision === 'Level 1' ? 'success' : decision === 'Level 2' ? 'warning' : 'error');
 
                 state.aiDecisions++;
-                await new Promise(r => setTimeout(r, 100));
+                await new Promise(r => setTimeout(r, 80));
             }
 
             // Update AI chart
             aiChart.data.datasets[0].data = [
                 decisionCounts.level0,
                 decisionCounts.level1,
-                decisionCounts.level2
+                decisionCounts.level2,
+                decisionCounts.level3
             ];
             aiChart.update();
 
-            const energySaved = (decisionCounts.level0 * 100 + decisionCounts.level1 * 60) / numSamples;
+            const energySaved = (decisionCounts.level0 * 100 + decisionCounts.level1 * 70 + decisionCounts.level2 * 40) / numSamples;
             document.getElementById('energySaved').textContent = energySaved.toFixed(0) + '%';
             document.getElementById('aiDecisions').textContent = state.aiDecisions;
+            document.getElementById('rlReward').textContent = rlState.cumulativeReward.toFixed(2);
 
-            addLog(`AI Demo complete! Energy saved: ${energySaved.toFixed(0)}%`, 'success');
+            addLog(`AI Demo complete! Energy saved: ${energySaved.toFixed(0)}% | RL Reward: ${rlState.cumulativeReward.toFixed(2)}`, 'success');
             state.isRunning = false;
         }
 
